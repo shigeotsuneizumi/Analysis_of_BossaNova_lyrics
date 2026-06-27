@@ -24,17 +24,27 @@
 1. amor amores amar amo amei などの活用形 は、区別せずに１つとして集計（SpaCyを利用）
 1. 頻出の単語の統計を行い、上位１００位まで表示
 
-分析フェーズは最終的には、別スクリプトとして単独で実行可能とする
-
-## 実行方法（作成中）
+## 環境構築
+導入：
 ```bash
+fetch_lyrics.py
+pip install lyricsgenius pandas
+
+
 pip install lyricsgenius pandas nltk wordcloud matplotlib unidecode
 ```
 
-実行：
+## 実行方法
+実行（検索＆登録フェーズ）：
 
 ```bash
-python analysis_of_bossanova_lirics.py
+python fetch_lyrics.py
+```
+
+実行（分析フェーズ）：
+
+```bash
+python analyze_lyrics.py
 ```
 
 ---
@@ -42,6 +52,8 @@ python analysis_of_bossanova_lirics.py
 # 出力されるファイル
 
 ```text
+songs_list.csv
+songs.csv
 output/
 ├── bossa_nova_songs.csv
 ├── bossa_nova_top50.csv
