@@ -1,143 +1,188 @@
-# ボサノバ歌詞解析スクリプト（作成中）
-## 概要
-- ボサノバの歌詞でよく使われているポルトガル語の単語を出力するためのツール
-- 任意のアーティストと曲名を複数指定して、そこで使用されている単語の統計をとることで頻出単語ランキングを表示可能
-- 言語はpython3を使用する
-- 歌詞共有サイトGeniusが提供するWeb APIを利用する
-- アーティスト、曲名の指定はcvs
-- 以下のフェーズでスクリプトを分けて処理を行う。
-  - 検索＆登録フェーズ
-  - 分析フェーズ
+# ボサノバ歌詞分析ツール
 
-### 検索＆登録フェーズ
-1. 歌詞検索のためのアーティスト名、曲名リストのcsvファイルを準備
-1. genius = lyricsgenius.Geniusで初期化
-1. genius.search_artistを使用して、指定したアーティスト名からlyricsgeniusに登録されているアーティストを特定
-1. さらにgenius.search_song を使用して、特定したアーティストと指定した曲名からlyricsgeniusに登録されている曲名を特定
-1. 特定したアーティスト名、曲名、曲の歌詞をデータとしてcvsファイルに登録
-　以前、同じアーティスト、同じ曲名データがある場合は検索および登録をスキップ
+トム・ジョビン（Antônio Carlos Jobim）のボサノバ歌詞を Genius API から収集し、頻出単語を分析するツールです。
 
-### 分析フェーズ（スクリプト化 or AIエージェントに回答させてもOK）
-1. 指定したアーティスト名と曲名の歌詞をcsvファイルから取得
-1. 冠詞、前置詞や接続詞など頻出の単語を除去
-1. 1曲の歌詞の中に同じ単語が繰り返し出てきた場合は、全ての回数をカウントせずに１つとして集計
-1. amor amores amar amo amei などの活用形 は、区別せずに１つとして集計（SpaCyを利用）
-1. 頻出の単語の統計を行い、上位１００位まで表示
+---
 
-## 環境構築
-導入：
-```bash
-fetch_lyrics.py
-pip install lyricsgenius pandas
+## ファイル構成
 
-
-pip install lyricsgenius pandas nltk wordcloud matplotlib unidecode
+```
+.
+├── songs_list.csv          # 取得対象の曲リスト（title, artist の2列）
+├── fetch_lyrics.py         # フェーズ1：歌詞取得スクリプト
+├── filter_pt_songs.py      # フェーズ1.5：ポルトガル語曲フィルタスクリプト
+├── analyze_lyrics.py       # フェーズ2：歌詞分析スクリプト
+└── output/
+    ├── lyrics_database.csv      # 取得した歌詞データベース（分析対象）
+    ├── lyrics_database_others.csv # ジョビン以外のアーティストの歌詞
+    ├── top50_words.csv          # 頻出単語 TOP50
+    ├── top50_words_pt.csv       # 頻出単語 TOP50（ポルトガル語曲のみ）
+    ├── wordcloud.png            # ワードクラウド画像
+    ├── wordcloud_pt.png         # ワードクラウド画像（ポルトガル語曲のみ）
+    └── top50_table_sns.png      # SNS投稿用 TOP50 テーブル画像
 ```
 
-## 実行方法
-実行（検索＆登録フェーズ）：
+---
+
+## セットアップ
+
+### 1. 仮想環境の作成
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 2. 依存ライブラリのインストール
+
+```bash
+pip install lyricsgenius pandas langdetect wordcloud matplotlib unidecode
+```
+
+### 3. Genius API トークンの取得
+
+1. [https://genius.com/api-clients](https://genius.com/api-clients) にアクセス
+2. アカウント登録後、「New API Client」でアプリを作成
+3. 発行された **Client Access Token** をコピー
+
+### 4. トークンを設定
+
+`fetch_lyrics.py` と `filter_pt_songs.py` の以下の行にトークンを貼り付けます：
+
+```python
+GENIUS_API_TOKEN = "ここにトークンを貼る"
+```
+
+---
+
+## 使い方
+
+### フェーズ 1：歌詞取得
+
+`songs_list.csv` に記載された曲の歌詞を Genius API から取得し、`output/lyrics_database.csv` に保存します。
 
 ```bash
 python fetch_lyrics.py
 ```
 
-実行（分析フェーズ）：
+- 既に取得済みの曲はスキップされます（差分取得）
+- 取得できなかった曲は `NOT FOUND` として表示されます
+
+**songs_list.csv のフォーマット：**
+
+```csv
+title,artist
+Garota de Ipanema,Antonio Carlos Jobim
+Wave,Antonio Carlos Jobim
+```
+
+---
+
+### フェーズ 1.5：Genius 上のポルトガル語曲を一括追加
+
+指定アーティストの Genius 登録曲を全件スキャンし、ポルトガル語の曲のみ `songs_list.csv` に追加します。その後 `fetch_lyrics.py` を実行して歌詞を取得します。
+
+```bash
+python filter_pt_songs.py
+python fetch_lyrics.py
+```
+
+- Genius API を全ページ取得（アーティスト ID は `filter_pt_songs.py` 内の `ARTIST_ID` で指定）
+- 各曲の言語を `/songs/{id}` エンドポイントで確認し、`language == "pt"` の曲のみ追加
+- 既に `songs_list.csv` に存在するタイトルはスキップ
+
+---
+
+### フェーズ 2：歌詞分析
+
+`output/lyrics_database.csv` の歌詞を分析し、頻出単語 TOP50 とワードクラウドを生成します。
 
 ```bash
 python analyze_lyrics.py
 ```
 
----
+**出力ファイル：**
 
-# 出力されるファイル
+| ファイル | 内容 |
+|----------|------|
+| `output/top50_words.csv` | 頻出単語 TOP50 |
+| `output/wordcloud.png` | ワードクラウド画像 |
 
-```text
-songs_list.csv
-songs.csv
-output/
-├── bossa_nova_songs.csv
-├── bossa_nova_top50.csv
-└── bossa_nova_wordcloud.png
-```
+**ポルトガル語曲のみで分析する場合（推奨）：**
 
----
-
-# 期待される頻出単語
-
-おそらく以下が大量に出ます：
-
-* amor
-* saudade
-* coracao
-* mar
-* noite
-* olhar
-* sol
-* samba
-* menina
-* felicidade
-
-かなり「ボサノバ空気」が見えます。
-
----
-
-# 発展アイデア
-
-## 1. Spotify API連携
-
-人気曲だけ取得。
-
----
-
-## 2. TF-IDF分析
-
-「Jobimだけ異常に多い単語」
-
----
-
-## 3. 感情分析
+`langdetect` で各曲の言語を判定してフィルタします。`analyze_lyrics.py` を参考に以下を追加してください：
 
 ```python
-from textblob import TextBlob
+from langdetect import detect, LangDetectException
+
+def is_portuguese(lyrics):
+    try:
+        return detect(lyrics) == "pt"
+    except LangDetectException:
+        return False
+
+songs_df = songs_df[songs_df["lyrics"].apply(is_portuguese)]
 ```
 
 ---
 
-## 4. NetworkXで単語ネットワーク
+## データ管理の注意点
+
+### 歌詞データベースの分割
+
+ジョビン以外のアーティストの曲は分析から除外し、別ファイルに保存することを推奨します：
 
 ```python
-import networkx as nx
+import pandas as pd
+
+df = pd.read_csv("output/lyrics_database.csv", encoding="utf-8-sig")
+jobim = df[df["artist"].isin(["Antonio Carlos Jobim", "Tom Jobim"])]
+others = df[~df["artist"].isin(["Antonio Carlos Jobim", "Tom Jobim"])]
+
+jobim.to_csv("output/lyrics_database.csv", index=False, encoding="utf-8-sig")
+others.to_csv("output/lyrics_database_others.csv", index=False, encoding="utf-8-sig")
 ```
 
----
+### 重複歌詞の除去
 
-## 5. ボサノバ歌詞ジェネレータ
+Genius には同じ歌詞が複数のタイトルで登録されている場合があります。MD5 ハッシュで除去します：
 
 ```python
-import markovify
+import hashlib
+
+df["lyrics_hash"] = df["lyrics"].apply(
+    lambda x: hashlib.md5(str(x).encode()).hexdigest()
+)
+df = df.drop_duplicates(subset="lyrics_hash", keep="first")
+df = df.drop(columns="lyrics_hash")
 ```
-
-で：
-
-```text
-Noite de verão
-Meu coração no mar
-```
-
-みたいな生成が可能。
 
 ---
 
-## 5. 熟語リスト
+## 分析結果（トム・ジョビン 123曲）
 
-単語ではなく頻出熟語のリスト作成
+### TOP 10 頻出単語
+
+| 順位 | 単語 | 意味 | 出現回数 |
+|------|------|------|---------|
+| 1 | nao | ない | 294 |
+| 2 | meu | 私の | 153 |
+| 3 | amor | 愛 | 152 |
+| 4 | vou | 行く/する | 117 |
+| 5 | vida | 人生 | 89 |
+| 6 | tem | ある/持つ | 81 |
+| 7 | mim | 私に | 79 |
+| 8 | sei | 知っている | 77 |
+| 9 | como | ように | 72 |
+| 10 | minha | 私の(女) | 66 |
+
+> ストップワード・英語歌詞除去済み
 
 ---
-# 注意点
 
-* Genius APIは大量アクセスすると制限されます
-* 商用利用は規約確認が必要
-* 歌詞著作権に注意
-* 取得失敗する曲もあります
+## 注意事項
 
-個人学習用途で楽しむのがおすすめです。
+- Genius API は大量リクエストでレート制限がかかる場合があります。`time.sleep()` によるリクエスト間隔の調整を推奨します
+- 一部の曲は歌詞ではなく別のテキスト（書籍等）が誤って登録されている場合があります
+- 歌詞の著作権は各権利者に帰属します。個人の学習・研究目的での利用を推奨します
+- 商用利用は Genius の利用規約を確認してください

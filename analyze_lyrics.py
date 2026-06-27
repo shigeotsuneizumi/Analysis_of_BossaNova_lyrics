@@ -5,7 +5,7 @@
 # 必要ライブラリ:
 # pip install pandas wordcloud matplotlib unidecode
 #
-# 事前に fetch_lyrics.py を実行して output/songs.csv を生成すること
+# 事前に fetch_lyrics.py を実行して output/lyrics_database.csv を生成すること
 #
 # 実行:
 # python analyze_lyrics.py
@@ -27,10 +27,10 @@ OUTPUT_DIR = Path("output")
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 # ============================================================
-# songs.csv 読み込み
+# lyrics_database.csv 読み込み
 # ============================================================
 
-songs_csv = OUTPUT_DIR / "songs.csv"
+songs_csv = OUTPUT_DIR / "lyrics_database.csv"
 
 if not songs_csv.exists():
     raise FileNotFoundError(

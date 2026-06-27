@@ -9,6 +9,7 @@
 # python fetch_lyrics.py
 # ============================================================
 
+import os
 import lyricsgenius
 import pandas as pd
 import re
@@ -19,7 +20,7 @@ from pathlib import Path
 # https://genius.com/api-clients
 # ============================================================
 
-GENIUS_API_TOKEN = "YOUR_GENIUS_API_TOKEN"
+GENIUS_API_TOKEN = os.environ.get("GENIUS_API_TOKEN", "")
 
 # ============================================================
 # 解析する曲リストCSV
@@ -62,11 +63,24 @@ genius = lyricsgenius.Genius(
 
 all_song_data = []
 
+# 既存データのキーセットを作成
+songs_csv = OUTPUT_DIR / "lyrics_database.csv"
+existing_keys = set()
+if songs_csv.exists():
+    existing_df = pd.read_csv(songs_csv, encoding="utf-8-sig")
+    existing_keys = set(zip(existing_df["title"], existing_df["artist"]))
+    print(f"既存データ: {len(existing_keys)} 曲")
+
 print("===================================")
 print("Loading songs...")
 print("===================================")
 
 for title, artist in SONGS:
+
+    if (title, artist) in existing_keys:
+        print(f"\nSkipped (already exists): {title} / {artist}")
+        continue
+
 
     print(f"\nLoading: {title} / {artist}")
 
@@ -103,14 +117,19 @@ print(f"Loaded songs: {len(all_song_data)}")
 print("===================================")
 
 # ============================================================
-# DataFrame保存
+# DataFrame保存（既存データとマージ）
 # ============================================================
 
-songs_df = pd.DataFrame(all_song_data)
+new_df = pd.DataFrame(all_song_data)
 
-songs_csv = OUTPUT_DIR / "songs.csv"
+if songs_csv.exists():
+    existing_df = pd.read_csv(songs_csv, encoding="utf-8-sig")
+    merged_df = pd.concat([existing_df, new_df], ignore_index=True)
+    merged_df = merged_df.drop_duplicates(subset=["title", "artist"], keep="first")
+else:
+    merged_df = new_df
 
-songs_df.to_csv(
+merged_df.to_csv(
     songs_csv,
     index=False,
     encoding="utf-8-sig"

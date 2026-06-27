@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+*.log
+.env
+output/lyrics_database.csv
+output/lyrics_database_others.csv
